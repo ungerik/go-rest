@@ -1,7 +1,7 @@
 /*
 todo: testing
 
-### github.com/ungerik/go-rest is a very simple REST ful server for Go.
+github.com/ungerik/go-rest is a very simple REST ful server for Go.
 
 It has only three functions: HandleGet, HandlePost, ListenAndServe.
 
@@ -244,6 +244,7 @@ func HandlePost(path string, handler interface{}) {
 	http.Handle(path, handlerWrapper)
 }
 
+// ListenAndServe starts an HTTP server with a given address with the registered GET and POST handlers.
 func ListenAndServe(addr string) {
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		panic(err.Error())
