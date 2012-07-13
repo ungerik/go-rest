@@ -3,6 +3,8 @@ todo: testing
 
 github.com/ungerik/go-rest is a very simple REST ful server for Go.
 
+Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
+
 It has only three functions: HandleGet, HandlePost, ListenAndServe.
 
 HandleGet uses a handler function that returns a struct or string
