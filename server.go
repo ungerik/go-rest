@@ -1,15 +1,20 @@
 /*
 todo: testing
 
-github.com/ungerik/go-rest is a very simple REST ful server for Go.
+# go-rest a really simple REST server for Go (structs + JSON FTW!)
 
-Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
+* Import: "github.com/ungerik/go-rest"
+* Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
 
 It has only three functions: HandleGet, HandlePost, ListenAndServe.
 
 HandleGet uses a handler function that returns a struct or string
 to create the GET response. Structs will be marshalled als JSON,
 strings will be used as body with auto-detected content type.
+
+Format of GET handler:
+
+	func([url.Values]) ([struct|*struct|string][, error]) {}
 
 Example:
 
@@ -45,6 +50,10 @@ to the handler function. An error result from handler will be displayed
 as 500 internal server error message. An optional first string result
 will be displayed as a 200 response body with auto-detected content type.
 
+Format of POST handler:
+
+	func([*struct|url.Values]) ([struct|*struct|string],[error]) {}
+
 Example:
 
 	json.HandlePost("/change-data", func(data *MyStruct) (err error) {
@@ -66,66 +75,6 @@ import (
 	"strconv"
 )
 
-type handlerWrapper struct {
-	getArgs     func(*http.Request) []reflect.Value
-	callback    reflect.Value
-	writeResult func([]reflect.Value, http.ResponseWriter)
-}
-
-func (self *handlerWrapper) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	result := self.callback.Call(self.getArgs(request))
-	self.writeResult(result, writer)
-}
-
-func (self *handlerWrapper) setResult(t reflect.Type) {
-	returnsError := false
-	switch t.NumOut() {
-	case 2:
-		if t.Out(1) == reflect.TypeOf(error(nil)) {
-			returnsError = true
-		} else {
-			panic(fmt.Sprintf("HandleGet(): second result value of handle must be of type error, got %s", t.Out(1)))
-		}
-		fallthrough
-	case 1:
-		r := t.Out(0)
-		if r.Kind() == reflect.Struct || (r.Kind() == reflect.Ptr && r.Elem().Kind() == reflect.Struct) {
-			self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
-				if returnsError && !result[1].IsNil() {
-					err := result[1].Interface().(error)
-					http.Error(writer, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				j, err := json.Marshal(result[0].Interface())
-				if err != nil {
-					http.Error(writer, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				writer.Header().Set("Content-Type", "application/json")
-				writer.Write(j)
-			}
-		} else if r.Kind() == reflect.String {
-			self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
-				if returnsError && !result[1].IsNil() {
-					err := result[1].Interface().(error)
-					http.Error(writer, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				bytes := []byte(result[0].String())
-				ct := http.DetectContentType(bytes)
-				writer.Header().Set("Content-Type", ct)
-				writer.Write(bytes)
-			}
-		} else {
-			panic(fmt.Sprintf("HandleGet(): first result value of handler must be of type string or struct(pointer), got %s", r))
-		}
-	case 0:
-		// do nothing, status code 200 will be returned		
-	default:
-		panic(fmt.Sprintf("HandleGet(): zero to two return values allowed, got %d", t.NumIn()))
-	}
-}
-
 /*
 HandleGet registers a HTTP GET handler for path.
 handler is a function with an optional url.Values argument.
@@ -137,6 +86,11 @@ then it will be used as response body with an auto-detected content type.
 An optional second result value of type error will 
 create a 500 internal server error response if not nil.
 All non error responses will use status code 200.
+
+Format of GET handler:
+
+	func([url.Values]) ([struct|*struct|string][, error]) {}
+
 */
 func HandleGet(path string, handler interface{}) {
 	t := reflect.TypeOf(handler)
@@ -186,6 +140,11 @@ then it will be used as response body with an auto-detected content type.
 An optional second result value of type error will 
 create a 500 internal server error response if not nil.
 All non error responses will use status code 200.
+
+Format of POST handler:
+
+	func([*struct|url.Values]) ([struct|*struct|string][, error]) {}
+
 */
 func HandlePost(path string, handler interface{}) {
 	t := reflect.TypeOf(handler)
@@ -250,5 +209,67 @@ func HandlePost(path string, handler interface{}) {
 func ListenAndServe(addr string) {
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		panic(err.Error())
+	}
+}
+
+type handlerWrapper struct {
+	getArgs     func(*http.Request) []reflect.Value
+	callback    reflect.Value
+	writeResult func([]reflect.Value, http.ResponseWriter)
+}
+
+func (self *handlerWrapper) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	result := self.callback.Call(self.getArgs(request))
+	self.writeResult(result, writer)
+}
+
+func (self *handlerWrapper) setResult(t reflect.Type) {
+	returnsError := false
+	switch t.NumOut() {
+	case 2:
+		if t.Out(1) == reflect.TypeOf(error(nil)) {
+			returnsError = true
+		} else {
+			panic(fmt.Sprintf("HandleGet(): second result value of handle must be of type error, got %s", t.Out(1)))
+		}
+		fallthrough
+	case 1:
+		r := t.Out(0)
+		if r.Kind() == reflect.Struct || (r.Kind() == reflect.Ptr && r.Elem().Kind() == reflect.Struct) {
+			self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
+				if returnsError && !result[1].IsNil() {
+					err := result[1].Interface().(error)
+					http.Error(writer, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				j, err := json.Marshal(result[0].Interface())
+				if err != nil {
+					http.Error(writer, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				writer.Header().Set("Content-Type", "application/json")
+				writer.Write(j)
+			}
+		} else if r.Kind() == reflect.String {
+			self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
+				if returnsError && !result[1].IsNil() {
+					err := result[1].Interface().(error)
+					http.Error(writer, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				bytes := []byte(result[0].String())
+				ct := http.DetectContentType(bytes)
+				writer.Header().Set("Content-Type", ct)
+				writer.Write(bytes)
+			}
+		} else {
+			panic(fmt.Sprintf("HandleGet(): first result value of handler must be of type string or struct(pointer), got %s", r))
+		}
+	case 0:
+		self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
+			// do nothing, status code 200 will be returned
+		}
+	default:
+		panic(fmt.Sprintf("HandleGet(): zero to two return values allowed, got %d", t.NumIn()))
 	}
 }

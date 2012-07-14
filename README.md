@@ -1,15 +1,20 @@
 todo: testing
 =======
 
-### github.com/ungerik/go-rest is a very simple REST ful server for Go.
+# go-rest a really simple REST server for Go (structs + JSON FTW!)
 
-Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
+* Import: "github.com/ungerik/go-rest"
+* Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
 
 It has only three functions: HandleGet, HandlePost, ListenAndServe.
 
 HandleGet uses a handler function that returns a struct or string
 to create the GET response. Structs will be marshalled als JSON,
 strings will be used as body with auto-detected content type.
+
+Format of GET handler:
+
+	func([url.Values]) ([struct|*struct|string][, error]) {}
 
 Example:
 
