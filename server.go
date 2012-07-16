@@ -1,7 +1,7 @@
 /*
 todo: testing
 
-## go-rest A simple REST framework for Go
+## mini-rest A minimalistic REST framework for Go
 
 * Import: "github.com/ungerik/go-rest"
 * Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
