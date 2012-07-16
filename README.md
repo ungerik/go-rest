@@ -1,7 +1,7 @@
 todo: testing
 =======
 
-# go-rest a really simple REST server for Go (structs + JSON FTW!)
+## go-rest a really simple REST server for Go (structs + JSON FTW!)
 
 * Import: "github.com/ungerik/go-rest"
 * Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest

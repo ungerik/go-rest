@@ -1,12 +1,14 @@
 /*
 todo: testing
 
-# go-rest a really simple REST server for Go (structs + JSON FTW!)
+## go-rest A simple REST framework for Go
 
 * Import: "github.com/ungerik/go-rest"
 * Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
 
-It has only three functions: HandleGet, HandlePost, ListenAndServe.
+### Go structs and JSON marshalling FTW!
+
+This package has only three functions: HandleGet, HandlePost, ListenAndServe.
 
 HandleGet uses a handler function that returns a struct or string
 to create the GET response. Structs will be marshalled als JSON,
@@ -69,10 +71,13 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 /*
@@ -95,7 +100,7 @@ Format of GET handler:
 func HandleGet(path string, handler interface{}) {
 	t := reflect.TypeOf(handler)
 	if t.Kind() != reflect.Func {
-		panic(fmt.Sprintf("HandleGet(): handler must be a function, got %T", handler))
+		panic(fmt.Errorf("HandleGet(): handler must be a function, got %T", handler))
 	}
 	handlerWrapper := &handlerWrapper{
 		callback: reflect.ValueOf(handler),
@@ -108,13 +113,13 @@ func HandleGet(path string, handler interface{}) {
 		}
 	case 1:
 		if t.In(0) != reflect.TypeOf(url.Values(nil)) {
-			panic(fmt.Sprintf("HandleGet(): handler argument must be url.Values, got %s", t.In(0)))
+			panic(fmt.Errorf("HandleGet(): handler argument must be url.Values, got %s", t.In(0)))
 		}
 		handlerWrapper.getArgs = func(request *http.Request) []reflect.Value {
 			return []reflect.Value{reflect.ValueOf(request.URL.Query())}
 		}
 	default:
-		panic(fmt.Sprintf("HandleGet(): handler accepts zero or one arguments, got %d", t.NumIn()))
+		panic(fmt.Errorf("HandleGet(): handler accepts zero or one arguments, got %d", t.NumIn()))
 	}
 	handlerWrapper.setResult(t)
 	http.Handle(path, handlerWrapper)
@@ -149,7 +154,7 @@ Format of POST handler:
 func HandlePost(path string, handler interface{}) {
 	t := reflect.TypeOf(handler)
 	if t.Kind() != reflect.Func {
-		panic(fmt.Sprintf("HandlePost(): handler must be a function, got %T", handler))
+		panic(fmt.Errorf("HandlePost(): handler must be a function, got %T", handler))
 	}
 	handlerWrapper := &handlerWrapper{
 		callback: reflect.ValueOf(handler),
@@ -159,7 +164,7 @@ func HandlePost(path string, handler interface{}) {
 	case 1:
 		a := t.In(0)
 		if a != reflect.TypeOf(url.Values(nil)) && (a.Kind() != reflect.Ptr || a.Elem().Kind() != reflect.Struct) {
-			panic(fmt.Sprintf("HandlePost(): first handler argument must be a struct pointer or url.Values, got %s", a))
+			panic(fmt.Errorf("HandlePost(): first handler argument must be a struct pointer or url.Values, got %s", a))
 		}
 		handlerWrapper.getArgs = func(request *http.Request) []reflect.Value {
 			request.ParseForm()
@@ -199,16 +204,43 @@ func HandlePost(path string, handler interface{}) {
 			return []reflect.Value{s}
 		}
 	default:
-		panic(fmt.Sprintf("HandlePost(): handler accepts only one or thwo arguments, got %d", t.NumIn()))
+		panic(fmt.Errorf("HandlePost(): handler accepts only one or thwo arguments, got %d", t.NumIn()))
 	}
 	handlerWrapper.setResult(t)
 	http.Handle(path, handlerWrapper)
 }
 
-// ListenAndServe starts an HTTP server with a given address with the registered GET and POST handlers.
-func ListenAndServe(addr string) {
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		panic(err.Error())
+/*
+ListenAndServe starts an HTTP server with a given address
+with the registered GET and POST handlers.
+*/
+func ListenAndServe(addr string, close chan bool) {
+	server := &http.Server{Addr: addr}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		panic(err)
+	}
+	if close != nil {
+		go func() {
+			for {
+				if flag := <-close; flag {
+					err := listener.Close()
+					if err != nil {
+						os.Stderr.WriteString(err.Error())
+					}
+					return
+				}
+			}
+		}()
+	}
+	err = server.Serve(listener)
+	// I know, that's a ugly and depending on undocumented behaviour.
+	// But when the implementation changes, we'll see it immediatly as panic.
+	// To the keepers of the Go standard libraries:
+	// I would be useful to return a documented error type
+	// when the network connection is closed.
+	if !strings.Contains(err.Error(), "use of closed network connection") {
+		panic(err)
 	}
 }
 
@@ -230,7 +262,7 @@ func (self *handlerWrapper) setResult(t reflect.Type) {
 		if t.Out(1) == reflect.TypeOf(error(nil)) {
 			returnsError = true
 		} else {
-			panic(fmt.Sprintf("HandleGet(): second result value of handle must be of type error, got %s", t.Out(1)))
+			panic(fmt.Errorf("HandleGet(): second result value of handle must be of type error, got %s", t.Out(1)))
 		}
 		fallthrough
 	case 1:
@@ -263,13 +295,13 @@ func (self *handlerWrapper) setResult(t reflect.Type) {
 				writer.Write(bytes)
 			}
 		} else {
-			panic(fmt.Sprintf("HandleGet(): first result value of handler must be of type string or struct(pointer), got %s", r))
+			panic(fmt.Errorf("HandleGet(): first result value of handler must be of type string or struct(pointer), got %s", r))
 		}
 	case 0:
 		self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
 			// do nothing, status code 200 will be returned
 		}
 	default:
-		panic(fmt.Sprintf("HandleGet(): zero to two return values allowed, got %d", t.NumIn()))
+		panic(fmt.Errorf("HandleGet(): zero to two return values allowed, got %d", t.NumIn()))
 	}
 }
