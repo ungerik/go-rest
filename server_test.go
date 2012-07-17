@@ -1,36 +1,82 @@
 package rest
 
 import (
-	"net/http"
 	"testing"
 )
 
-const ServerAddr = ":8080"
+const ServerAddr = "0.0.0.0:8080"
 
 var closeChan chan bool = make(chan bool)
 
-func startServer() {
-	ListenAndServe(ServerAddr, closeChan)
+type MyIntType int
+
+type Struct struct {
+	Bool      bool
+	Int       int
+	Uint      uint
+	Ignore    int `json:"-"`
+	Float32   float32
+	Float64   float64
+	String    string
+	SubStruct SubStruct
 }
 
-func stopServer() {
-	closeChan <- true
+type SubStruct struct {
+	A MyIntType
+	B MyIntType
 }
 
-func TestStartStopServer(t *testing.T) {
+func NewStruct() *Struct {
+	return &Struct{
+		Bool:    true,
+		Int:     1,
+		Uint:    2,
+		Ignore:  3,
+		Float32: 4,
+		Float64: 5,
+		String:  "7",
+		SubStruct: SubStruct{
+			A: 8,
+			B: 9,
+		},
+	}
+}
+
+var RefStruct Struct = Struct{
+	Bool:    true,
+	Int:     1,
+	Uint:    2,
+	Ignore:  0, // default value instead of 3 because of json:"-"
+	Float32: 4,
+	Float64: 5,
+	String:  "7",
+	SubStruct: SubStruct{
+		A: 8,
+		B: 9,
+	},
+}
+
+func TestStartServer(t *testing.T) {
 	go ListenAndServe(ServerAddr, closeChan)
-	closeChan <- true
-}
-
-type TestStruct struct {
-	Int    int
-	String string
 }
 
 func TestHandleGet(t *testing.T) {
-	http.DefaultServeMux = http.NewServeMux()
-	HandleGet("/", func() *TestStruct {
-		return nil
+	path := "/"
+	HandleGet(path, func() *Struct {
+		return NewStruct()
 	})
-	// Output:
+
+	var result Struct
+	err := GetJson("http://"+ServerAddr+path, &result)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if result != RefStruct {
+		t.Errorf("GET %s: invalid result", ServerAddr+path)
+	}
+}
+
+func TestStopServer(t *testing.T) {
+	closeChan <- true
 }
