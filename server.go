@@ -1,14 +1,27 @@
 /*
-todo: testing
-
 ## go-rest A minimalistic REST framework for Go
 
+* Go structs and JSON marshalling FTW!
 * Import: "github.com/ungerik/go-rest"
 * Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
 
-### Go structs and JSON marshalling FTW!
+The framework consists of only three functions:
+HandleGet, HandlePost, ListenAndServe.
 
-This package has only three functions: HandleGet, HandlePost, ListenAndServe.
+Discussion:
+
+This can be considered bad design because because
+HandleGet and HandlePost use dynamic typing to hide 36 combinations
+of handler function types to make the interface _easy_ to use.
+36 static functions would have been more lines of code but
+_simpler_ in their implementation than the dynamic solution.
+See this great talk about easy vs. simple:
+http://www.infoq.com/presentations/Simple-Made-Easy
+Rob Pike may also dislike this approach:
+https://groups.google.com/d/msg/golang-nuts/z4T_n4MHbXM/jT9PoYc6I1IJ
+On the other side: Are all users of dynamic languages wrong?
+
+So let's start with the dynamic fun:
 
 HandleGet uses a handler function that returns a struct or string
 to create the GET response. Structs will be marshalled als JSON,
@@ -102,27 +115,27 @@ func HandleGet(path string, handler interface{}) {
 	if t.Kind() != reflect.Func {
 		panic(fmt.Errorf("HandleGet(): handler must be a function, got %T", handler))
 	}
-	handlerWrapper := &handlerWrapper{
-		callback: reflect.ValueOf(handler),
+	httpHandler := &httpHandler{
+		handler: handler,
 	}
 	// Check handler arguments and install getter
 	switch t.NumIn() {
 	case 0:
-		handlerWrapper.getArgs = func(request *http.Request) []reflect.Value {
+		httpHandler.getArgs = func(request *http.Request) []reflect.Value {
 			return nil
 		}
 	case 1:
 		if t.In(0) != reflect.TypeOf(url.Values(nil)) {
 			panic(fmt.Errorf("HandleGet(): handler argument must be url.Values, got %s", t.In(0)))
 		}
-		handlerWrapper.getArgs = func(request *http.Request) []reflect.Value {
+		httpHandler.getArgs = func(request *http.Request) []reflect.Value {
 			return []reflect.Value{reflect.ValueOf(request.URL.Query())}
 		}
 	default:
 		panic(fmt.Errorf("HandleGet(): handler accepts zero or one arguments, got %d", t.NumIn()))
 	}
-	handlerWrapper.setResult(t)
-	http.Handle(path, handlerWrapper)
+	httpHandler.writeResult = writeResultFunc(t)
+	http.Handle(path, httpHandler)
 }
 
 /*
@@ -156,8 +169,8 @@ func HandlePost(path string, handler interface{}) {
 	if t.Kind() != reflect.Func {
 		panic(fmt.Errorf("HandlePost(): handler must be a function, got %T", handler))
 	}
-	handlerWrapper := &handlerWrapper{
-		callback: reflect.ValueOf(handler),
+	httpHandler := &httpHandler{
+		handler: handler,
 	}
 	// Check handler arguments and install getter
 	switch t.NumIn() {
@@ -166,7 +179,7 @@ func HandlePost(path string, handler interface{}) {
 		if a != reflect.TypeOf(url.Values(nil)) && (a.Kind() != reflect.Ptr || a.Elem().Kind() != reflect.Struct) {
 			panic(fmt.Errorf("HandlePost(): first handler argument must be a struct pointer or url.Values, got %s", a))
 		}
-		handlerWrapper.getArgs = func(request *http.Request) []reflect.Value {
+		httpHandler.getArgs = func(request *http.Request) []reflect.Value {
 			request.ParseForm()
 			if a == reflect.TypeOf(url.Values(nil)) {
 				return []reflect.Value{reflect.ValueOf(request.Form)}
@@ -206,8 +219,8 @@ func HandlePost(path string, handler interface{}) {
 	default:
 		panic(fmt.Errorf("HandlePost(): handler accepts only one or thwo arguments, got %d", t.NumIn()))
 	}
-	handlerWrapper.setResult(t)
-	http.Handle(path, handlerWrapper)
+	httpHandler.writeResult = writeResultFunc(t)
+	http.Handle(path, httpHandler)
 }
 
 /*
@@ -244,22 +257,22 @@ func ListenAndServe(addr string, close chan bool) {
 	}
 }
 
-type handlerWrapper struct {
+type httpHandler struct {
 	getArgs     func(*http.Request) []reflect.Value
-	callback    reflect.Value
+	handler     interface{}
 	writeResult func([]reflect.Value, http.ResponseWriter)
 }
 
-func (self *handlerWrapper) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	result := self.callback.Call(self.getArgs(request))
+func (self *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	result := reflect.ValueOf(self.handler).Call(self.getArgs(request))
 	self.writeResult(result, writer)
 }
 
-func (self *handlerWrapper) setResult(t reflect.Type) {
+func writeResultFunc(t reflect.Type) func([]reflect.Value, http.ResponseWriter) {
 	returnsError := false
 	switch t.NumOut() {
 	case 2:
-		if IsErrorType(t.Out(1)) {
+		if t.Out(1) == reflect.TypeOf((*error)(nil)).Elem() {
 			returnsError = true
 		} else {
 			panic(fmt.Errorf("HandleGet(): second result value of handle must be of type error, got %s", t.Out(1)))
@@ -268,7 +281,7 @@ func (self *handlerWrapper) setResult(t reflect.Type) {
 	case 1:
 		r := t.Out(0)
 		if r.Kind() == reflect.Struct || (r.Kind() == reflect.Ptr && r.Elem().Kind() == reflect.Struct) {
-			self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
+			return func(result []reflect.Value, writer http.ResponseWriter) {
 				if returnsError && !result[1].IsNil() {
 					err := result[1].Interface().(error)
 					http.Error(writer, err.Error(), http.StatusInternalServerError)
@@ -283,7 +296,7 @@ func (self *handlerWrapper) setResult(t reflect.Type) {
 				writer.Write(j)
 			}
 		} else if r.Kind() == reflect.String {
-			self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
+			return func(result []reflect.Value, writer http.ResponseWriter) {
 				if returnsError && !result[1].IsNil() {
 					err := result[1].Interface().(error)
 					http.Error(writer, err.Error(), http.StatusInternalServerError)
@@ -298,10 +311,9 @@ func (self *handlerWrapper) setResult(t reflect.Type) {
 			panic(fmt.Errorf("HandleGet(): first result value of handler must be of type string or struct(pointer), got %s", r))
 		}
 	case 0:
-		self.writeResult = func(result []reflect.Value, writer http.ResponseWriter) {
+		return func(result []reflect.Value, writer http.ResponseWriter) {
 			// do nothing, status code 200 will be returned
 		}
-	default:
-		panic(fmt.Errorf("HandleGet(): zero to two return values allowed, got %d", t.NumIn()))
 	}
+	panic(fmt.Errorf("HandleGet(): zero to two return values allowed, got %d", t.NumIn()))
 }

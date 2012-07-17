@@ -5,13 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 )
-
-// IsErrorType checks if t is the built-in type error.
-func IsErrorType(t reflect.Type) bool {
-	return t == reflect.TypeOf(func(error) {}).In(0)
-}
 
 // GetJson sends a HTTP GET request to addr and
 // unmarshalles the JSON response to out.
