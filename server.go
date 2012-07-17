@@ -259,7 +259,7 @@ func (self *handlerWrapper) setResult(t reflect.Type) {
 	returnsError := false
 	switch t.NumOut() {
 	case 2:
-		if t.Out(1) == reflect.TypeOf(error(nil)) {
+		if IsErrorType(t.Out(1)) {
 			returnsError = true
 		} else {
 			panic(fmt.Errorf("HandleGet(): second result value of handle must be of type error, got %s", t.Out(1)))

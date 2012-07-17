@@ -1,6 +1,7 @@
 package rest
 
 import (
+	// "errors"
 	"testing"
 )
 
@@ -60,21 +61,48 @@ func TestStartServer(t *testing.T) {
 	go ListenAndServe(ServerAddr, closeChan)
 }
 
-func TestHandleGet(t *testing.T) {
-	path := "/"
+func TestHandleGet_struct(t *testing.T) {
+	path := "/struct.json"
 	HandleGet(path, func() *Struct {
 		return NewStruct()
 	})
-
 	var result Struct
-	err := GetJson("http://"+ServerAddr+path, &result)
+	err := GetJsonStrict("http://"+ServerAddr+path, &result)
 	if err != nil {
 		t.Error(err)
 	}
-
 	if result != RefStruct {
 		t.Errorf("GET %s: invalid result", ServerAddr+path)
 	}
+}
+
+func TestHandleGet_struct_error(t *testing.T) {
+	noerrorPath := "/struct_noerror.json"
+	HandleGet(noerrorPath, func() (*Struct, error) {
+		return NewStruct(), nil
+	})
+	var result Struct
+	err := GetJsonStrict("http://"+ServerAddr+noerrorPath, &result)
+	if err != nil {
+		t.Error(err)
+	}
+	if result != RefStruct {
+		t.Errorf("GET %s: invalid result", ServerAddr+noerrorPath)
+	}
+
+	// errorPath := "/struct_error.json"
+	// errorMessage := "Test Error"
+	// HandleGet(path, func() (*Struct, error) {
+	// 	return nil, errors.New(errorMessage)
+	// })
+	// response, err := http.Get("http://"+ServerAddr+errorPath)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	// if response.Header.
+	// if result != RefStruct {
+	// 	t.Errorf("GET %s: invalid result", ServerAddr+errorPath)
+	// }
 }
 
 func TestStopServer(t *testing.T) {
