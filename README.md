@@ -14,14 +14,15 @@ This can be considered bad design because because
 HandleGet and HandlePost use dynamic typing to hide 36 combinations
 of handler function types to make the interface _easy_ to use.
 36 static functions would have been more lines of code but
-_simpler_ in their implementation than the dynamic solution.
+dramatic _simpler_ in their implementation.
 See this great talk about easy vs. simple:
 http://www.infoq.com/presentations/Simple-Made-Easy
 Rob Pike may also dislike this approach:
 https://groups.google.com/d/msg/golang-nuts/z4T_n4MHbXM/jT9PoYc6I1IJ
 On the other side: Are all users of dynamic languages wrong?
 
-So let's start with the dynamic fun:
+Now let's get started with this little madness,
+maybe it's useful and fun after all:
 
 HandleGet uses a handler function that returns a struct or string
 to create the GET response. Structs will be marshalled als JSON,
