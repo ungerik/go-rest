@@ -23,6 +23,8 @@ func main() {
 		return NewStruct()
 	})
 
+	rest.HandleGet("/get-method", NewStruct(), "Get")
+
 	rest.HandleGet("/error", func() (*Struct, error) {
 		return nil, errors.New("This is an error!")
 	})

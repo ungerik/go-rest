@@ -125,14 +125,15 @@ Format of GET handler:
 	func([url.Values]) ([struct|*struct|string][, error]) {}
 
 */
-func HandleGet(path string, handler interface{}) {
-	t := reflect.TypeOf(handler)
+func HandleGet(path string, handler interface{}, methodName ...string) {
+	handlerFunc := getHandlerFunc(handler, methodName)
+	t := handlerFunc.Type()
 	if t.Kind() != reflect.Func {
 		panic(fmt.Errorf("HandleGet(): handler must be a function, got %T", handler))
 	}
 	httpHandler := &httpHandler{
-		method:  "GET",
-		handler: handler,
+		method:      "GET",
+		handlerFunc: handlerFunc,
 	}
 	// Check handler arguments and install getter
 	switch t.NumIn() {
@@ -191,14 +192,15 @@ Format of POST handler:
 	func([*struct|url.Values]) ([struct|*struct|string][, error]) {}
 
 */
-func HandlePost(path string, handler interface{}) {
-	t := reflect.TypeOf(handler)
+func HandlePost(path string, handler interface{}, methodName ...string) {
+	handlerFunc := getHandlerFunc(handler, methodName)
+	t := handlerFunc.Type()
 	if t.Kind() != reflect.Func {
 		panic(fmt.Errorf("HandlePost(): handler must be a function, got %T", handler))
 	}
 	httpHandler := &httpHandler{
-		method:  "POST",
-		handler: handler,
+		method:      "POST",
+		handlerFunc: handlerFunc,
 	}
 	// Check handler arguments and install getter
 	switch t.NumIn() {
@@ -337,13 +339,30 @@ func RunServer(addr string, stop chan bool) {
 	}
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Internal stuff:
+
+func getHandlerFunc(handler interface{}, methodName []string) reflect.Value {
+	switch len(methodName) {
+	case 0:
+		return reflect.ValueOf(handler)
+	case 1:
+		handlerFunc := reflect.ValueOf(handler).MethodByName(methodName[0])
+		if !handlerFunc.IsValid() {
+			panic(fmt.Errorf("WrapMethod(): object of type %T has no method %s", handler, methodName[0]))
+		}
+		return handlerFunc
+	}
+	panic(fmt.Errorf("HandleGet(): only zero or one methodName allowed, got %d", len(methodName)))
+}
+
 var urlValuesType reflect.Type = reflect.TypeOf((*url.Values)(nil)).Elem()
 var errorType reflect.Type = reflect.TypeOf((*error)(nil)).Elem()
 
 type httpHandler struct {
 	method      string
 	getArgs     func(*http.Request) []reflect.Value
-	handler     interface{}
+	handlerFunc reflect.Value
 	writeResult func([]reflect.Value, http.ResponseWriter)
 }
 
@@ -355,7 +374,7 @@ func (self *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		http.Error(writer, "405: Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	result := reflect.ValueOf(self.handler).Call(self.getArgs(request))
+	result := self.handlerFunc.Call(self.getArgs(request))
 	self.writeResult(result, writer)
 }
 

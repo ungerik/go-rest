@@ -105,6 +105,8 @@ func TestHandleGet_struct_error(t *testing.T) {
 	// }
 }
 
+// TODO: needs much more testing, but see example for some working code
+
 func TestStopServer(t *testing.T) {
 	closeChan <- true
 }
