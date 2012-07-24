@@ -1,5 +1,5 @@
 /*
-## go-rest A minimalistic REST framework for Go
+## go-rest A small and evil REST framework for Go
 
 ### Reflection, Go structs, and JSON marshalling FTW!
 
@@ -38,12 +38,12 @@ Yes, that introduces some internal complexity,
 but this complexity is still very low in absolute terms
 and thus easy to control and debug.
 The complexity of the dynamic code also does not spill over
-into the package users' code, because the package user
-uses structs and all the static typed goodness that
-come with them.
+into the package users' code, because the arguments and
+results of the handler functions must be static typed
+and can't be interface{}.
 
-Now let's get started with this little dynamic madness,
-maybe it's useful and fun after all:
+So is it evil? Maybe.
+But maybe it's also useful and fun to use.
 
 HandleGet uses a handler function that returns a struct or string
 to create the GET response. Structs will be marshalled as JSON,
