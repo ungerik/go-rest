@@ -25,6 +25,10 @@ func main() {
 
 	rest.HandleGet("/get-method", NewStruct(), "Get")
 
+	rest.HandleGet("/index.html", func() string {
+		return "<!doctype html><p>Hello World!"
+	})
+
 	rest.HandleGet("/error", func() (*Struct, error) {
 		return nil, errors.New("This is an error!")
 	})

@@ -1,3 +1,4 @@
+/*
 ## go-rest A minimalistic REST framework for Go
 
 ### Reflection, Go structs, and JSON marshalling FTW!
@@ -104,3 +105,5 @@ as the name of the handler-method of this object.
 Exampe:
 
 	rest.HandleGet("/method-call", myObject, "MethodName")
+*/
+package rest
