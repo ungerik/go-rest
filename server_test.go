@@ -58,7 +58,7 @@ var RefStruct Struct = Struct{
 }
 
 func TestStartServer(t *testing.T) {
-	go ListenAndServe(ServerAddr, closeChan)
+	go RunServer(ServerAddr, closeChan)
 }
 
 func TestHandleGet_struct(t *testing.T) {

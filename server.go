@@ -6,7 +6,7 @@
 * Documentation: http://go.pkgdoc.org/github.com/ungerik/go-rest
 
 The framework consists of only three functions:
-HandleGet, HandlePost, ListenAndServe.
+HandleGet, HandlePost, RunServer.
 
 Discussion:
 
@@ -83,9 +83,11 @@ Example:
 package rest
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -94,6 +96,17 @@ import (
 	"strconv"
 	"strings"
 )
+
+// IndentJSON is the string with which JSON output will be indented. 
+var IndentJSON string
+
+// Logger will be used for request and error logging in not nil
+var Logger *log.Logger
+
+// DontCheckRequestMethod disables checking for the correct
+// request method for a handler, which would result in a
+// 405 error if not correct.
+var DontCheckRequestMethod bool
 
 /*
 HandleGet registers a HTTP GET handler for path.
@@ -118,6 +131,7 @@ func HandleGet(path string, handler interface{}) {
 		panic(fmt.Errorf("HandleGet(): handler must be a function, got %T", handler))
 	}
 	httpHandler := &httpHandler{
+		method:  "GET",
 		handler: handler,
 	}
 	// Check handler arguments and install getter
@@ -183,6 +197,7 @@ func HandlePost(path string, handler interface{}) {
 		panic(fmt.Errorf("HandlePost(): handler must be a function, got %T", handler))
 	}
 	httpHandler := &httpHandler{
+		method:  "POST",
 		handler: handler,
 	}
 	// Check handler arguments and install getter
@@ -195,7 +210,7 @@ func HandlePost(path string, handler interface{}) {
 		httpHandler.getArgs = func(request *http.Request) []reflect.Value {
 			ct := request.Header.Get("Content-Type")
 			switch ct {
-			case "application/x-www-form-urlencoded":
+			case "", "application/x-www-form-urlencoded":
 				request.ParseForm()
 				if a == urlValuesType {
 					return []reflect.Value{reflect.ValueOf(request.Form)}
@@ -281,19 +296,21 @@ func HandlePost(path string, handler interface{}) {
 }
 
 /*
-ListenAndServe starts an HTTP server with a given address
+RunServer starts an HTTP server with a given address
 with the registered GET and POST handlers.
+If stop is non nil then the value true sent over the
+channel will gracefully stop the server.
 */
-func ListenAndServe(addr string, close chan bool) {
+func RunServer(addr string, stop chan bool) {
 	server := &http.Server{Addr: addr}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		panic(err)
 	}
-	if close != nil {
+	if stop != nil {
 		go func() {
 			for {
-				if flag := <-close; flag {
+				if flag := <-stop; flag {
 					err := listener.Close()
 					if err != nil {
 						os.Stderr.WriteString(err.Error())
@@ -302,6 +319,9 @@ func ListenAndServe(addr string, close chan bool) {
 				}
 			}
 		}()
+	}
+	if Logger != nil {
+		Logger.Println("go-rest server listening at", listener.Addr())
 	}
 	err = server.Serve(listener)
 	// I know, that's a ugly and depending on undocumented behaviour.
@@ -312,20 +332,38 @@ func ListenAndServe(addr string, close chan bool) {
 	if !strings.Contains(err.Error(), "use of closed network connection") {
 		panic(err)
 	}
+	if Logger != nil {
+		Logger.Println("go-rest server stopped")
+	}
 }
 
 var urlValuesType reflect.Type = reflect.TypeOf((*url.Values)(nil)).Elem()
 var errorType reflect.Type = reflect.TypeOf((*error)(nil)).Elem()
 
 type httpHandler struct {
+	method      string
 	getArgs     func(*http.Request) []reflect.Value
 	handler     interface{}
 	writeResult func([]reflect.Value, http.ResponseWriter)
 }
 
 func (self *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if Logger != nil {
+		Logger.Println(request.Method, request.URL)
+	}
+	if !DontCheckRequestMethod && request.Method != self.method {
+		http.Error(writer, "405: Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	result := reflect.ValueOf(self.handler).Call(self.getArgs(request))
 	self.writeResult(result, writer)
+}
+
+func writeError(writer http.ResponseWriter, err error) {
+	if Logger != nil {
+		Logger.Println("ERROR", err)
+	}
+	http.Error(writer, err.Error(), http.StatusInternalServerError)
 }
 
 func writeResultFunc(t reflect.Type) func([]reflect.Value, http.ResponseWriter) {
@@ -335,8 +373,7 @@ func writeResultFunc(t reflect.Type) func([]reflect.Value, http.ResponseWriter) 
 		if t.Out(1) == errorType {
 			returnError = func(result []reflect.Value, writer http.ResponseWriter) (isError bool) {
 				if isError = !result[1].IsNil(); isError {
-					err := result[1].Interface().(error)
-					http.Error(writer, err.Error(), http.StatusInternalServerError)
+					writeError(writer, result[1].Interface().(error))
 				}
 				return isError
 			}
@@ -353,8 +390,17 @@ func writeResultFunc(t reflect.Type) func([]reflect.Value, http.ResponseWriter) 
 				}
 				j, err := json.Marshal(result[0].Interface())
 				if err != nil {
-					http.Error(writer, err.Error(), http.StatusInternalServerError)
+					writeError(writer, err)
 					return
+				}
+				if IndentJSON != "" {
+					var buf bytes.Buffer
+					err = json.Indent(&buf, j, "", IndentJSON)
+					if err != nil {
+						writeError(writer, err)
+						return
+					}
+					j = buf.Bytes()
 				}
 				writer.Header().Set("Content-Type", "application/json")
 				writer.Write(j)
