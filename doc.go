@@ -14,12 +14,14 @@ Download, build and run example:
 	cd github.com/ungerik/go-rest/example
 	go install && example
 
-The framework consists of only three functions:
+Small?
+
+Yes, the framework consists of only three functions:
 HandleGet, HandlePost, RunServer.
 
-Discussion:
+Evil?
 
-This package can be considered bad design because
+Well, this package can be considered bad design because
 HandleGet and HandlePost use dynamic typing to hide 36 combinations
 of handler function types to make the interface _easy_ to use.
 36 static functions would have been more lines of code but
@@ -30,10 +32,11 @@ See this great talk about easy vs. simple:
 http://www.infoq.com/presentations/Simple-Made-Easy
 Rob Pike may also dislike this approach:
 https://groups.google.com/d/msg/golang-nuts/z4T_n4MHbXM/jT9PoYc6I1IJ
-So this package may be seen as an anti-pattern to all
-that is good and right about Go.
-Why use it then? Well, it is _easy_: it brings the good
-parts of dynamic behaviour to Go.
+So yes, this package can be called evild because it is an
+anti-pattern to all that is good and right about Go.
+
+Why use it then? By maximizing dynamic code
+it is easy to use and reduces code.
 Yes, that introduces some internal complexity,
 but this complexity is still very low in absolute terms
 and thus easy to control and debug.
@@ -42,8 +45,7 @@ into the package users' code, because the arguments and
 results of the handler functions must be static typed
 and can't be interface{}.
 
-So is it evil? Maybe.
-But maybe it's also useful and fun to use.
+Now let's have some fun:
 
 HandleGet uses a handler function that returns a struct or string
 to create the GET response. Structs will be marshalled as JSON,
