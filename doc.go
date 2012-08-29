@@ -99,12 +99,12 @@ Example:
 		return err
 	})
 
-Both HandleGet and HandlePost also accept one optional string argument.
-In that case handler is interpreted as an object and the string argument
-as the name of the handler-method of this object.
+Both HandleGet and HandlePost also accept one optional object argument.
+In that case handler is interpreted as a method of the type of object
+and called accordingly.
 
 Example:
 
-	rest.HandleGet("/method-call", myObject, "MethodName")
+	rest.HandleGet("/method-call", (*myType).MethodName, myTypeObject)
 */
 package rest

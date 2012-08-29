@@ -38,42 +38,38 @@ An optional second result value of type error will
 create a 500 internal server error response if not nil.
 All non error responses will use status code 200.
 
-A single optional argument can be passed to methodName.
-In that case handler is interpreted as an object and
-methodName is the name of the handler method of that object.
+A single optional argument can be passed as object.
+In that case handler is interpreted as a method and
+object is the address of an object with such a method.
 
 Format of GET handler:
 
 	func([url.Values]) ([struct|*struct|string][, error]) {}
 
 */
-func HandleGet(path string, handler interface{}, methodName ...string) {
-	handlerFunc := getHandlerFunc(handler, methodName)
-	t := handlerFunc.Type()
-	if t.Kind() != reflect.Func {
-		panic(fmt.Errorf("HandleGet(): handler must be a function, got %T", handler))
-	}
+func HandleGet(path string, handler interface{}, object ...interface{}) {
+	handlerFunc, in, out := getHandlerFunc(handler, object)
 	httpHandler := &httpHandler{
 		method:      "GET",
 		handlerFunc: handlerFunc,
 	}
 	// Check handler arguments and install getter
-	switch t.NumIn() {
+	switch len(in) {
 	case 0:
 		httpHandler.getArgs = func(request *http.Request) []reflect.Value {
 			return nil
 		}
 	case 1:
-		if t.In(0) != reflect.TypeOf(url.Values(nil)) {
-			panic(fmt.Errorf("HandleGet(): handler argument must be url.Values, got %s", t.In(0)))
+		if in[0] != reflect.TypeOf(url.Values(nil)) {
+			panic(fmt.Errorf("HandleGet(): handler argument must be url.Values, got %s", in[0]))
 		}
 		httpHandler.getArgs = func(request *http.Request) []reflect.Value {
 			return []reflect.Value{reflect.ValueOf(request.URL.Query())}
 		}
 	default:
-		panic(fmt.Errorf("HandleGet(): handler accepts zero or one arguments, got %d", t.NumIn()))
+		panic(fmt.Errorf("HandleGet(): handler accepts zero or one arguments, got %d", len(in)))
 	}
-	httpHandler.writeResult = writeResultFunc(t)
+	httpHandler.writeResult = writeResultFunc(out)
 	http.Handle(path, httpHandler)
 }
 
@@ -107,29 +103,25 @@ An optional second result value of type error will
 create a 500 internal server error response if not nil.
 All non error responses will use status code 200.
 
-A single optional argument can be passed to methodName.
-In that case handler is interpreted as an object and
-methodName is the name of the handler method of that object.
+A single optional argument can be passed as object.
+In that case handler is interpreted as a method and
+object is the address of an object with such a method.
 
 Format of POST handler:
 
 	func([*struct|url.Values]) ([struct|*struct|string][, error]) {}
 
 */
-func HandlePost(path string, handler interface{}, methodName ...string) {
-	handlerFunc := getHandlerFunc(handler, methodName)
-	t := handlerFunc.Type()
-	if t.Kind() != reflect.Func {
-		panic(fmt.Errorf("HandlePost(): handler must be a function, got %T", handler))
-	}
+func HandlePost(path string, handler interface{}, object ...interface{}) {
+	handlerFunc, in, out := getHandlerFunc(handler, object)
 	httpHandler := &httpHandler{
 		method:      "POST",
 		handlerFunc: handlerFunc,
 	}
 	// Check handler arguments and install getter
-	switch t.NumIn() {
+	switch len(in) {
 	case 1:
-		a := t.In(0)
+		a := in[0]
 		if a != urlValuesType && (a.Kind() != reflect.Ptr || a.Elem().Kind() != reflect.Struct) {
 			panic(fmt.Errorf("HandlePost(): first handler argument must be a struct pointer or url.Values, got %s", a))
 		}
@@ -215,9 +207,9 @@ func HandlePost(path string, handler interface{}, methodName ...string) {
 			panic("Unsupported POST Content-Type: " + ct)
 		}
 	default:
-		panic(fmt.Errorf("HandlePost(): handler accepts only one or thwo arguments, got %d", t.NumIn()))
+		panic(fmt.Errorf("HandlePost(): handler accepts only one or thwo arguments, got %d", len(in)))
 	}
-	httpHandler.writeResult = writeResultFunc(t)
+	httpHandler.writeResult = writeResultFunc(out)
 	http.Handle(path, httpHandler)
 }
 
@@ -247,7 +239,7 @@ func RunServer(addr string, stop chan bool) {
 		}()
 	}
 	if Logger != nil {
-		Logger.Println("go-rest server listening at", listener.Addr())
+		Logger.Println("go-rest server listening at", addr)
 	}
 	err = server.Serve(listener)
 	// I know, that's a ugly and depending on undocumented behavior.
@@ -266,27 +258,53 @@ func RunServer(addr string, stop chan bool) {
 ///////////////////////////////////////////////////////////////////////////////
 // Internal stuff:
 
-func getHandlerFunc(handler interface{}, methodName []string) reflect.Value {
-	switch len(methodName) {
-	case 0:
-		return reflect.ValueOf(handler)
-	case 1:
-		handlerFunc := reflect.ValueOf(handler).MethodByName(methodName[0])
-		if !handlerFunc.IsValid() {
-			panic(fmt.Errorf("WrapMethod(): object of type %T has no method %s", handler, methodName[0]))
-		}
-		return handlerFunc
+func getHandlerFunc(handler interface{}, object []interface{}) (f reflectionFunc, in, out []reflect.Type) {
+	handlerValue := reflect.ValueOf(handler)
+	if handlerValue.Kind() != reflect.Func {
+		panic(fmt.Errorf("handler must be a function, got %T", handler))
 	}
-	panic(fmt.Errorf("HandleGet(): only zero or one methodName allowed, got %d", len(methodName)))
+	handlerType := handlerValue.Type()
+	out = make([]reflect.Type, handlerType.NumOut())
+	for i := 0; i < handlerType.NumOut(); i++ {
+		out[i] = handlerType.Out(i)
+	}
+	switch len(object) {
+	case 0:
+		f = func(args []reflect.Value) []reflect.Value {
+			return handlerValue.Call(args)
+		}
+		in = make([]reflect.Type, handlerType.NumIn())
+		for i := 0; i < handlerType.NumIn(); i++ {
+			in[i] = handlerType.In(i)
+		}
+		return f, in, out
+	case 1:
+		objectValue := reflect.ValueOf(object[0])
+		if objectValue.Kind() != reflect.Ptr {
+			panic(fmt.Errorf("object must be a pointer, got %T", objectValue.Interface()))
+		}
+		f = func(args []reflect.Value) []reflect.Value {
+			args = append([]reflect.Value{objectValue}, args...)
+			return handlerValue.Call(args)
+		}
+		in = make([]reflect.Type, handlerType.NumIn()-1)
+		for i := 1; i < handlerType.NumIn(); i++ {
+			in[i] = handlerType.In(i)
+		}
+		return f, in, out
+	}
+	panic(fmt.Errorf("HandleGet(): only zero or one object allowed, got %d", len(object)))
 }
 
 var urlValuesType reflect.Type = reflect.TypeOf((*url.Values)(nil)).Elem()
 var errorType reflect.Type = reflect.TypeOf((*error)(nil)).Elem()
 
+type reflectionFunc func([]reflect.Value) []reflect.Value
+
 type httpHandler struct {
 	method      string
 	getArgs     func(*http.Request) []reflect.Value
-	handlerFunc reflect.Value
+	handlerFunc reflectionFunc
 	writeResult func([]reflect.Value, http.ResponseWriter)
 }
 
@@ -298,7 +316,7 @@ func (self *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		http.Error(writer, "405: Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	result := self.handlerFunc.Call(self.getArgs(request))
+	result := self.handlerFunc(self.getArgs(request))
 	self.writeResult(result, writer)
 }
 
@@ -309,11 +327,11 @@ func writeError(writer http.ResponseWriter, err error) {
 	http.Error(writer, err.Error(), http.StatusInternalServerError)
 }
 
-func writeResultFunc(t reflect.Type) func([]reflect.Value, http.ResponseWriter) {
+func writeResultFunc(out []reflect.Type) func([]reflect.Value, http.ResponseWriter) {
 	var returnError func(result []reflect.Value, writer http.ResponseWriter) bool
-	switch t.NumOut() {
+	switch len(out) {
 	case 2:
-		if t.Out(1) == errorType {
+		if out[1] == errorType {
 			returnError = func(result []reflect.Value, writer http.ResponseWriter) (isError bool) {
 				if isError = !result[1].IsNil(); isError {
 					writeError(writer, result[1].Interface().(error))
@@ -321,11 +339,11 @@ func writeResultFunc(t reflect.Type) func([]reflect.Value, http.ResponseWriter) 
 				return isError
 			}
 		} else {
-			panic(fmt.Errorf("HandleGet(): second result value of handle must be of type error, got %s", t.Out(1)))
+			panic(fmt.Errorf("HandleGet(): second result value of handle must be of type error, got %s", out[1]))
 		}
 		fallthrough
 	case 1:
-		r := t.Out(0)
+		r := out[0]
 		if r.Kind() == reflect.Struct || (r.Kind() == reflect.Ptr && r.Elem().Kind() == reflect.Struct) {
 			return func(result []reflect.Value, writer http.ResponseWriter) {
 				if returnError != nil && returnError(result, writer) {
@@ -359,12 +377,12 @@ func writeResultFunc(t reflect.Type) func([]reflect.Value, http.ResponseWriter) 
 				writer.Write(bytes)
 			}
 		} else {
-			panic(fmt.Errorf("HandleGet(): first result value of handler must be of type string or struct(pointer), got %s", r))
+			panic(fmt.Errorf("first result value of handler must be of type string or struct(pointer), got %s", r))
 		}
 	case 0:
 		return func(result []reflect.Value, writer http.ResponseWriter) {
 			// do nothing, status code 200 will be returned
 		}
 	}
-	panic(fmt.Errorf("HandleGet(): zero to two return values allowed, got %d", t.NumIn()))
+	panic(fmt.Errorf("zero to two return values allowed, got %d", len(out)))
 }

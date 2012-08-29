@@ -23,7 +23,7 @@ func main() {
 		return NewStruct()
 	})
 
-	rest.HandleGet("/get-method", NewStruct(), "Get")
+	rest.HandleGet("/get-method", (*Struct).Get, NewStruct())
 
 	rest.HandleGet("/index.html", func() string {
 		return "<!doctype html><p>Hello World!"
@@ -48,5 +48,5 @@ func main() {
 		return fmt.Sprintf("%v", in)
 	})
 
-	rest.RunServer(":8080", stopServerChan)
+	rest.RunServer("0.0.0.0:8080", stopServerChan)
 }
