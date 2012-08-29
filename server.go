@@ -250,10 +250,10 @@ func RunServer(addr string, stop chan bool) {
 		Logger.Println("go-rest server listening at", listener.Addr())
 	}
 	err = server.Serve(listener)
-	// I know, that's a ugly and depending on undocumented behaviour.
-	// But when the implementation changes, we'll see it immediatly as panic.
+	// I know, that's a ugly and depending on undocumented behavior.
+	// But when the implementation changes, we'll see it immediately as panic.
 	// To the keepers of the Go standard libraries:
-	// I would be useful to return a documented error type
+	// It would be useful to return a documented error type
 	// when the network connection is closed.
 	if !strings.Contains(err.Error(), "use of closed network connection") {
 		panic(err)

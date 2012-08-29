@@ -10,8 +10,7 @@
 Download, build and run example:
 
 	go get github.com/ungerik/go-rest
-	cd github.com/ungerik/go-rest/example
-	go install && example
+	go install github.com/ungerik/go-rest/example && example
 
 Small?
 
@@ -31,7 +30,7 @@ See this great talk about easy vs. simple:
 http://www.infoq.com/presentations/Simple-Made-Easy
 Rob Pike may also dislike this approach:
 https://groups.google.com/d/msg/golang-nuts/z4T_n4MHbXM/jT9PoYc6I1IJ
-So yes, this package can be called evild because it is an
+So yes, this package can be called evil because it is an
 anti-pattern to all that is good and right about Go.
 
 Why use it then? By maximizing dynamic code
@@ -103,7 +102,7 @@ Both HandleGet and HandlePost also accept one optional string argument.
 In that case handler is interpreted as an object and the string argument
 as the name of the handler-method of this object.
 
-Exampe:
+Example:
 
 	rest.HandleGet("/method-call", myObject, "MethodName")
 
