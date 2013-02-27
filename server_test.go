@@ -1,3 +1,4 @@
+// +build !goci
 package rest
 
 import (
