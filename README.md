@@ -56,7 +56,7 @@ Format of GET handler:
 Example:
 
 	type MyStruct struct {
-		A in
+		A int
 		B string
 	}
 
