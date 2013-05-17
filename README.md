@@ -56,7 +56,7 @@ Format of GET handler:
 Example:
 
 	type MyStruct struct {
-		A in
+		A int
 		B string
 	}
 
@@ -69,7 +69,7 @@ Example:
 	})
 
 The GET handler function can optionally accept an url.Values argument
-and return an error as second result value that will be displayed as
+and returns an error as second result value that will be displayed as
 500 internal server error if not nil.
 
 Example:
