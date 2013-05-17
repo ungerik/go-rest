@@ -15,11 +15,12 @@ import (
 	"strings"
 )
 
-// IndentJSON is the string with which JSON output will be indented. 
+// IndentJSON is the string with which JSON output will be indented.
 var IndentJSON string
 
-// Logger will be used for request and error logging in not nil
-var Logger *log.Logger
+// Log is a function pointer compatible to fmt.Println or log.Println.
+// The default value is log.Println.
+var Log = log.Println
 
 // DontCheckRequestMethod disables checking for the correct
 // request method for a handler, which would result in a
@@ -34,7 +35,7 @@ If the first result value of handler is a struct or struct pointer,
 then the struct will be marshalled as JSON response.
 If the first result value fo handler is a string,
 then it will be used as response body with an auto-detected content type.
-An optional second result value of type error will 
+An optional second result value of type error will
 create a 500 internal server error response if not nil.
 All non error responses will use status code 200.
 
@@ -83,7 +84,7 @@ is allowed as handler argument and the request body will be interpreted
 as JSON and unmarshalled to a new struct instance.
 
 If the request content type multipart/form-data, then only a struct pointer
-is allowed as handler argument and a file named JSON 
+is allowed as handler argument and a file named JSON
 will be unmarshalled to a new struct instance.
 
 If the request content type is empty or application/x-www-form-urlencoded
@@ -99,7 +100,7 @@ If the first result value of handler is a struct or struct pointer,
 then the struct will be marshalled as JSON response.
 If the first result value fo handler is a string,
 then it will be used as response body with an auto-detected content type.
-An optional second result value of type error will 
+An optional second result value of type error will
 create a 500 internal server error response if not nil.
 All non error responses will use status code 200.
 
@@ -238,9 +239,7 @@ func RunServer(addr string, stop chan bool) {
 			}
 		}()
 	}
-	if Logger != nil {
-		Logger.Println("go-rest server listening at", addr)
-	}
+	Log("go-rest server listening at", addr)
 	err = server.Serve(listener)
 	// I know, that's a ugly and depending on undocumented behavior.
 	// But when the implementation changes, we'll see it immediately as panic.
@@ -250,9 +249,7 @@ func RunServer(addr string, stop chan bool) {
 	if !strings.Contains(err.Error(), "use of closed network connection") {
 		panic(err)
 	}
-	if Logger != nil {
-		Logger.Println("go-rest server stopped")
-	}
+	Log("go-rest server stopped")
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -309,9 +306,7 @@ type httpHandler struct {
 }
 
 func (self *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	if Logger != nil {
-		Logger.Println(request.Method, request.URL)
-	}
+	Log(request.Method, request.URL)
 	if !DontCheckRequestMethod && request.Method != self.method {
 		http.Error(writer, "405: Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -321,9 +316,7 @@ func (self *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Req
 }
 
 func writeError(writer http.ResponseWriter, err error) {
-	if Logger != nil {
-		Logger.Println("ERROR", err)
-	}
+	Log("ERROR:", err)
 	http.Error(writer, err.Error(), http.StatusInternalServerError)
 }
 

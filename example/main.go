@@ -3,9 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
-	"os"
 
 	"github.com/ungerik/go-rest"
 )
@@ -13,7 +11,6 @@ import (
 func main() {
 	// Make debugging easier
 	rest.DontCheckRequestMethod = true
-	rest.Logger = log.New(os.Stdout, "", 0)
 	rest.IndentJSON = "  "
 
 	// See RunServer below
