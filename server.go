@@ -15,20 +15,22 @@ import (
 	"strings"
 )
 
-// IndentJSON is the string with which JSON output will be indented.
-var IndentJSON string
+var (
+	// IndentJSON is the string with which JSON output will be indented.
+	IndentJSON string
 
-// Log is a function pointer compatible to fmt.Println or log.Println.
-// The default value is log.Println.
-var Log = log.Println
+	// Log is a function pointer compatible to fmt.Println or log.Println.
+	// The default value is log.Println.
+	Log = log.Println
 
-// DontCheckRequestMethod disables checking for the correct
-// request method for a handler, which would result in a
-// 405 error if not correct.
-var DontCheckRequestMethod bool
+	// DontCheckRequestMethod disables checking for the correct
+	// request method for a handler, which would result in a
+	// 405 error if not correct.
+	DontCheckRequestMethod bool
+)
 
 /*
-HandleGet registers a HTTP GET handler for path.
+HandleGET registers a HTTP GET handler for path.
 handler is a function with an optional url.Values argument.
 
 If the first result value of handler is a struct or struct pointer,
@@ -48,7 +50,7 @@ Format of GET handler:
 	func([url.Values]) ([struct|*struct|string][, error]) {}
 
 */
-func HandleGet(path string, handler interface{}, object ...interface{}) {
+func HandleGET(path string, handler interface{}, object ...interface{}) {
 	handlerFunc, in, out := getHandlerFunc(handler, object)
 	httpHandler := &httpHandler{
 		method:      "GET",
@@ -62,20 +64,20 @@ func HandleGet(path string, handler interface{}, object ...interface{}) {
 		}
 	case 1:
 		if in[0] != reflect.TypeOf(url.Values(nil)) {
-			panic(fmt.Errorf("HandleGet(): handler argument must be url.Values, got %s", in[0]))
+			panic(fmt.Errorf("HandleGET(): handler argument must be url.Values, got %s", in[0]))
 		}
 		httpHandler.getArgs = func(request *http.Request) []reflect.Value {
 			return []reflect.Value{reflect.ValueOf(request.URL.Query())}
 		}
 	default:
-		panic(fmt.Errorf("HandleGet(): handler accepts zero or one arguments, got %d", len(in)))
+		panic(fmt.Errorf("HandleGET(): handler accepts zero or one arguments, got %d", len(in)))
 	}
 	httpHandler.writeResult = writeResultFunc(out)
 	http.Handle(path, httpHandler)
 }
 
 /*
-HandlePost registers a HTTP POST handler for path.
+HandlePOST registers a HTTP POST handler for path.
 handler is a function that takes a struct pointer or url.Values
 as argument.
 
@@ -113,7 +115,7 @@ Format of POST handler:
 	func([*struct|url.Values]) ([struct|*struct|string][, error]) {}
 
 */
-func HandlePost(path string, handler interface{}, object ...interface{}) {
+func HandlePOST(path string, handler interface{}, object ...interface{}) {
 	handlerFunc, in, out := getHandlerFunc(handler, object)
 	httpHandler := &httpHandler{
 		method:      "POST",
@@ -124,7 +126,7 @@ func HandlePost(path string, handler interface{}, object ...interface{}) {
 	case 1:
 		a := in[0]
 		if a != urlValuesType && (a.Kind() != reflect.Ptr || a.Elem().Kind() != reflect.Struct) {
-			panic(fmt.Errorf("HandlePost(): first handler argument must be a struct pointer or url.Values, got %s", a))
+			panic(fmt.Errorf("HandlePOST(): first handler argument must be a struct pointer or url.Values, got %s", a))
 		}
 		httpHandler.getArgs = func(request *http.Request) []reflect.Value {
 			ct := request.Header.Get("Content-Type")
@@ -171,7 +173,7 @@ func HandlePost(path string, handler interface{}, object ...interface{}) {
 
 			case "text/plain":
 				if a == urlValuesType {
-					panic(fmt.Errorf("HandlePost(): first handler argument must be a struct pointer when request Content-Type is text/plain, got %s", a))
+					panic(fmt.Errorf("HandlePOST(): first handler argument must be a struct pointer when request Content-Type is text/plain, got %s", a))
 				}
 				s := reflect.New(a.Elem())
 				defer request.Body.Close()
@@ -187,7 +189,7 @@ func HandlePost(path string, handler interface{}, object ...interface{}) {
 
 			case "multipart/form-data":
 				if a == urlValuesType {
-					panic(fmt.Errorf("HandlePost(): first handler argument must be a struct pointer when request Content-Type is multipart/form-data, got %s", a))
+					panic(fmt.Errorf("HandlePOST(): first handler argument must be a struct pointer when request Content-Type is multipart/form-data, got %s", a))
 				}
 				file, _, err := request.FormFile("JSON")
 				if err != nil {
@@ -208,7 +210,7 @@ func HandlePost(path string, handler interface{}, object ...interface{}) {
 			panic("Unsupported POST Content-Type: " + ct)
 		}
 	default:
-		panic(fmt.Errorf("HandlePost(): handler accepts only one or thwo arguments, got %d", len(in)))
+		panic(fmt.Errorf("HandlePOST(): handler accepts only one or thwo arguments, got %d", len(in)))
 	}
 	httpHandler.writeResult = writeResultFunc(out)
 	http.Handle(path, httpHandler)
@@ -290,11 +292,13 @@ func getHandlerFunc(handler interface{}, object []interface{}) (f reflectionFunc
 		}
 		return f, in, out
 	}
-	panic(fmt.Errorf("HandleGet(): only zero or one object allowed, got %d", len(object)))
+	panic(fmt.Errorf("HandleGET(): only zero or one object allowed, got %d", len(object)))
 }
 
-var urlValuesType reflect.Type = reflect.TypeOf((*url.Values)(nil)).Elem()
-var errorType reflect.Type = reflect.TypeOf((*error)(nil)).Elem()
+var (
+	urlValuesType = reflect.TypeOf((*url.Values)(nil)).Elem()
+	errorType     = reflect.TypeOf((*error)(nil)).Elem()
+)
 
 type reflectionFunc func([]reflect.Value) []reflect.Value
 
@@ -305,14 +309,14 @@ type httpHandler struct {
 	writeResult func([]reflect.Value, http.ResponseWriter)
 }
 
-func (self *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (handler *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	Log(request.Method, request.URL)
-	if !DontCheckRequestMethod && request.Method != self.method {
+	if !DontCheckRequestMethod && request.Method != handler.method {
 		http.Error(writer, "405: Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	result := self.handlerFunc(self.getArgs(request))
-	self.writeResult(result, writer)
+	result := handler.handlerFunc(handler.getArgs(request))
+	handler.writeResult(result, writer)
 }
 
 func writeError(writer http.ResponseWriter, err error) {
@@ -332,7 +336,7 @@ func writeResultFunc(out []reflect.Type) func([]reflect.Value, http.ResponseWrit
 				return isError
 			}
 		} else {
-			panic(fmt.Errorf("HandleGet(): second result value of handle must be of type error, got %s", out[1]))
+			panic(fmt.Errorf("HandleGET(): second result value of handle must be of type error, got %s", out[1]))
 		}
 		fallthrough
 	case 1:

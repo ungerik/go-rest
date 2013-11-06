@@ -16,12 +16,12 @@ Download, build and run example:
 Small?
 
 Yes, the framework consists of only three functions:
-HandleGet, HandlePost, RunServer.
+HandleGET, HandlePOST, RunServer.
 
 Evil?
 
 Well, this package can be considered bad design because
-HandleGet and HandlePost use dynamic typing to hide 36 combinations
+HandleGET and HandlePOST use dynamic typing to hide 36 combinations
 of handler function types to make the interface _easy_ to use.
 36 static functions would have been more lines of code but
 dramatic _simpler_ in their individual implementations.
@@ -46,7 +46,7 @@ and can't be interface{}.
 
 Now let's have some fun:
 
-HandleGet uses a handler function that returns a struct or string
+HandleGET uses a handler function that returns a struct or string
 to create the GET response. Structs will be marshalled as JSON,
 strings will be used as body with auto-detected content type.
 
@@ -61,11 +61,11 @@ Example:
 		B string
 	}
 
-	rest.HandleGet("/data.json", func() *MyStruct {
+	rest.HandleGET("/data.json", func() *MyStruct {
 		return &MyStruct{A: 1, B: "Hello World"}
 	})
 
-	rest.HandleGet("/index.html", func() string {
+	rest.HandleGET("/index.html", func() string {
 		return "<!doctype html><p>Hello World"
 	})
 
@@ -75,7 +75,7 @@ and return an error as second result value that will be displayed as
 
 Example:
 
-	rest.HandleGet("/data.json", func(params url.Values) (string, error) {
+	rest.HandleGET("/data.json", func(params url.Values) (string, error) {
 		v := params.Get("value")
 		if v == "" {
 			return nil, errors.New("Expecting GET parameter 'value'")
@@ -83,7 +83,7 @@ Example:
 		return "value = " + v, nil
 	})
 
-HandlePost maps POST form data or a JSON document to a struct that is passed
+HandlePOST maps POST form data or a JSON document to a struct that is passed
 to the handler function. An error result from handler will be displayed
 as 500 internal server error message. An optional first string result
 will be displayed as a 200 response body with auto-detected content type.
@@ -94,17 +94,17 @@ Format of POST handler:
 
 Example:
 
-	rest.HandlePost("/change-data", func(data *MyStruct) (err error) {
+	rest.HandlePOST("/change-data", func(data *MyStruct) (err error) {
 		// save data
 		return err
 	})
 
-Both HandleGet and HandlePost also accept one optional object argument.
+Both HandleGET and HandlePOST also accept one optional object argument.
 In that case handler is interpreted as a method of the type of object
 and called accordingly.
 
 Example:
 
-	rest.HandleGet("/method-call", (*myType).MethodName, myTypeObject)
+	rest.HandleGET("/method-call", (*myType).MethodName, myTypeObject)
 */
 package rest

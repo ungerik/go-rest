@@ -2,13 +2,12 @@
 package rest
 
 import (
-	// "reflect"
 	"testing"
 )
 
 const ServerAddr = "0.0.0.0:8080"
 
-var closeChan chan bool = make(chan bool)
+var closeChan = make(chan bool)
 
 type MyIntType int
 
@@ -44,7 +43,7 @@ func NewStruct() *Struct {
 	}
 }
 
-var RefStruct Struct = Struct{
+var RefStruct = Struct{
 	Bool:    true,
 	Int:     1,
 	Uint:    2,
@@ -62,13 +61,13 @@ func TestStartServer(t *testing.T) {
 	go RunServer(ServerAddr, closeChan)
 }
 
-func TestHandleGet_struct(t *testing.T) {
+func TestHandleGET_struct(t *testing.T) {
 	path := "/struct.json"
-	HandleGet(path, func() *Struct {
+	HandleGET(path, func() *Struct {
 		return NewStruct()
 	})
 	var result Struct
-	err := GetJsonStrict("http://"+ServerAddr+path, &result)
+	err := GetJSONStrict("http://"+ServerAddr+path, &result)
 	if err != nil {
 		t.Error(err)
 	}
@@ -77,13 +76,13 @@ func TestHandleGet_struct(t *testing.T) {
 	}
 }
 
-func TestHandleGet_struct_error(t *testing.T) {
+func TestHandleGET_struct_error(t *testing.T) {
 	noerrorPath := "/struct_noerror.json"
-	HandleGet(noerrorPath, func() (*Struct, error) {
+	HandleGET(noerrorPath, func() (*Struct, error) {
 		return NewStruct(), nil
 	})
 	var result Struct
-	err := GetJsonStrict("http://"+ServerAddr+noerrorPath, &result)
+	err := GetJSONStrict("http://"+ServerAddr+noerrorPath, &result)
 	if err != nil {
 		t.Error(err)
 	}
@@ -93,7 +92,7 @@ func TestHandleGet_struct_error(t *testing.T) {
 
 	// errorPath := "/struct_error.json"
 	// errorMessage := "Test Error"
-	// HandleGet(path, func() (*Struct, error) {
+	// HandleGET(path, func() (*Struct, error) {
 	// 	return nil, errors.New(errorMessage)
 	// })
 	// response, err := http.Get("http://"+ServerAddr+errorPath)
