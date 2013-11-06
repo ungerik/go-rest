@@ -1,5 +1,16 @@
 package main
 
+type Struct struct {
+	Bool      bool
+	Int       int
+	Uint      uint
+	Ignore    int `json:"-"`
+	Float32   float32
+	Float64   float64
+	String    string
+	SubStruct SubStruct
+}
+
 func NewStruct() *Struct {
 	return &Struct{
 		Bool:    true,
@@ -14,17 +25,6 @@ func NewStruct() *Struct {
 			B: 9,
 		},
 	}
-}
-
-type Struct struct {
-	Bool      bool
-	Int       int
-	Uint      uint
-	Ignore    int `json:"-"`
-	Float32   float32
-	Float64   float64
-	String    string
-	SubStruct SubStruct
 }
 
 func (self *Struct) Get() *Struct {

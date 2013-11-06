@@ -241,7 +241,7 @@ func RunServer(addr string, stop chan bool) {
 			}
 		}()
 	}
-	Log("go-rest server listening at", addr)
+	Log("Server listening at", addr)
 	err = server.Serve(listener)
 	// I know, that's a ugly and depending on undocumented behavior.
 	// But when the implementation changes, we'll see it immediately as panic.
@@ -251,7 +251,7 @@ func RunServer(addr string, stop chan bool) {
 	if !strings.Contains(err.Error(), "use of closed network connection") {
 		panic(err)
 	}
-	Log("go-rest server stopped")
+	Log("Server stopped")
 }
 
 ///////////////////////////////////////////////////////////////////////////////
