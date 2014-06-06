@@ -219,10 +219,10 @@ func HandlePOST(path string, handler interface{}, object ...interface{}) {
 /*
 RunServer starts an HTTP server with a given address
 with the registered GET and POST handlers.
-If stop is non nil then the value true sent over the
-channel will gracefully stop the server.
+If stop is non nil then a send on the channel
+will gracefully stop the server.
 */
-func RunServer(addr string, stop chan bool) {
+func RunServer(addr string, stop chan struct{}) {
 	server := &http.Server{Addr: addr}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -230,15 +230,12 @@ func RunServer(addr string, stop chan bool) {
 	}
 	if stop != nil {
 		go func() {
-			for {
-				if flag := <-stop; flag {
-					err := listener.Close()
-					if err != nil {
-						os.Stderr.WriteString(err.Error())
-					}
-					return
-				}
+			<-stop
+			err := listener.Close()
+			if err != nil {
+				os.Stderr.WriteString(err.Error())
 			}
+			return
 		}()
 	}
 	Log("Server listening at", addr)

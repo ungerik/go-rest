@@ -7,7 +7,7 @@ import (
 
 const ServerAddr = "0.0.0.0:8080"
 
-var closeChan = make(chan bool)
+var closeChan = make(chan struct{})
 
 type MyIntType int
 
@@ -108,5 +108,5 @@ func TestHandleGET_struct_error(t *testing.T) {
 // TODO: needs much more testing, but see example for some working code
 
 func TestStopServer(t *testing.T) {
-	closeChan <- true
+	closeChan <- struct{}{}
 }
