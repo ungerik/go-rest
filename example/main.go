@@ -14,7 +14,7 @@ func main() {
 	rest.IndentJSON = "  "
 
 	// See RunServer below
-	stopServerChan := make(chan bool)
+	stopServerChan := make(chan struct{})
 
 	rest.HandleGET("/struct.json", func() *Struct {
 		return NewStruct()
@@ -31,7 +31,7 @@ func main() {
 	})
 
 	rest.HandleGET("/close", func() string {
-		stopServerChan <- true
+		stopServerChan <- struct{}{}
 		return "stoping server..."
 	})
 
