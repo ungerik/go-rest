@@ -143,6 +143,7 @@ var (
 	// DontCheckRequestMethod disables checking for the correct
 	// request method for a handler, which would result in a
 	// 405 error if not correct.
+	// Handy for testing POST handler via hand crafted GET requests.
 	DontCheckRequestMethod bool
 )
 
